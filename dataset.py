@@ -4,10 +4,9 @@ import requests
 from io import BytesIO
 import numpy as np
 import cv2
-from collections import Counter
-from ast import literal_eval
 import itertools
 import shutil
+import random
 
 import torch
 import torch.nn as nn
@@ -19,6 +18,17 @@ from torch.utils.data import Dataset, DataLoader
 
 
 # ==== Some useless utils ==========
+def read_file(path):
+    with open(path, 'r') as f:
+        return f.readlines()
+
+
+def save_iterable(path, _iter):
+    with open(path, 'w') as f:
+        for line in _iter:
+            f.write(f'{line}\n')
+    print(f'Saved successfully to {path}')
+
 
 def get_filepaths_recursive(dir):
     import itertools
@@ -50,7 +60,6 @@ def parallelize(func, inputs, n_workers=4):
 
 
 def copy_images_to(paths, out_dir, n_workers=4):
-    from functools import partial
     os.makedirs(out_dir, exist_ok=True)
     
     def copy_img(args):
@@ -64,7 +73,6 @@ def copy_images_to(paths, out_dir, n_workers=4):
 
     index_image_pairs = zip(itertools.count(start=0, step=1), paths)
     parallelize(copy_img, index_image_pairs, n_workers=n_workers)
-
 
 
 # =====================================
@@ -81,12 +89,43 @@ class WatermarkDataset(torch.utils.data.Dataset):
 
 
 image_dir = 'data/images'
-# print(Counter([filename.split('.')[1] for filename in get_filenames_recursive(image_dir)]))
-# print(get_filenames_recursive(image_dir)[:10])
-image_paths = get_filepaths_recursive(image_dir)
-# print(*image_paths[:10], sep='\n')
+watermark_dir = 'data/watermark'
 
-copy_images_to(image_paths, 'data/images_', n_workers=4)
+watermarks = [
+    "CONFIDENTIAL", "SAMPLE", "DRAFT", "PRIVATE", "RESTRICTED", 
+    "DO NOT COPY", "FOR INTERNAL USE ONLY", "CLASSIFIED", "COPYRIGHT", 
+    "UNAUTHORIZED REPRODUCTION PROHIBITED", "COMPANY NAME CONFIDENTIAL", 
+    "INTERNAL DOCUMENT", "COMPANY SECRETS", "PROPERTY OF [YOUR COMPANY]", 
+    "BUSINESS CONFIDENTIAL", "PROPRIETARY", "TOP SECRET", "SENSITIVE INFORMATION", 
+    "OFFICIAL DOCUMENT", "NOT FOR DISTRIBUTION", "READ-ONLY", "LIMITED ACCESS", 
+    "BETA VERSION", "FINAL VERSION", "PROTECTED DOCUMENT", "VERIFIED COPY", 
+    "SCANNED COPY", "DO NOT PRINT", "PREVIEW ONLY", "WATERMARKED DOCUMENT", 
+    "LEGAL DOCUMENT", "ATTORNEY-CLIENT PRIVILEGED", "NOT FOR RESALE", 
+    "CONTROLLED COPY", "CLIENT CONFIDENTIAL", "FINANCIAL REPORT", 
+    "BOARD OF DIRECTORS ONLY", "INVESTOR CONFIDENTIAL", "UNDER NDA", 
+    "PERSONAL & CONFIDENTIAL", "EMPLOYEE CONFIDENTIAL", "GOVERNMENT DOCUMENT", 
+    "FOR RESEARCH PURPOSES", "TRIAL VERSION", "EVALUATION COPY", "SECURITY PROTECTED", 
+    "LICENSED COPY", "UNAUTHORIZED USE PROHIBITED", "PERSONAL COPY", 
+    "CUSTOMER CONFIDENTIAL", "UNAPPROVED DRAFT", "PATENT PENDING", 
+    "RESTRICTED DISTRIBUTION", "FINAL DRAFT", "FOR REVIEW ONLY", 
+    "FOR DEMONSTRATION PURPOSES", "INTERNAL MEMO", "FOR TRAINING USE ONLY", 
+    "VERIFIED AUTHENTIC", "COMPANY POLICY DOCUMENT", "EVIDENCE COPY", 
+    "OFFICIAL USE ONLY", "AUDIT COPY", "MEDICAL RECORD", "SECURE FILE", 
+    "STRICTLY PRIVATE", "NO REPRODUCTION ALLOWED", "FOR APPROVAL ONLY", 
+    "UNDER REVISION", "PENDING REVIEW", "INTERNAL USE", "SENSITIVE DATA", 
+    "TRAINING MATERIAL", "FOR CEO REVIEW", "CONTRACT COPY", "MASTER COPY", 
+    "NO PUBLIC SHARING", "WATERMARK TEST", "NON-DISCLOSURE AGREEMENT", 
+    "LEGAL COMPLIANCE", "BOARD MEETING NOTES", "PRIVATE REPORT", "FOR EDITING ONLY", 
+    "CONFIDENTIAL WORK-IN-PROGRESS", "DRAFT PROPOSAL", "STRATEGIC PLAN", 
+    "INTERNAL ANALYSIS", "FINANCIAL STATEMENT", "FOR AUDITOR REVIEW", 
+    "NON-EDITABLE COPY", "INTELLECTUAL PROPERTY", "DO NOT FORWARD", 
+    "PROTECTED CONTENT", "LEGAL COMPLIANCE ONLY", "COMPANY CONFIDENTIAL", 
+    "SECURITY CLASSIFIED", "PRIVILEGED & CONFIDENTIAL", "UNDER INVESTIGATION", 
+    "SUBJECT TO CHANGE", "EXCLUSIVE CONTENT", "PATENT CONFIDENTIAL", 
+    "DO NOT CIRCULATE", "MANAGEMENT EYES ONLY"
+]
 
+
+save_iterable('data/watermark_texts.txt', watermarks)
 
 
