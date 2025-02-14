@@ -23,6 +23,8 @@ print(FIXED_TEXTS[:10])
 
 CLEAN_DIR = 'data/images_'
 WATERMARK_DIR = 'data/watermark'
+CLEAN_UPSCALED_DIR = 'data/upscaled'
+WATERMARK_UPSCALED_DIR = 'data/watermark_upscaled'
 
 # ======== Utils for utils :D ==============
 
@@ -165,7 +167,6 @@ def center_crop(image, w, h):
     return image[int(y):int(y+h), int(x):int(x+w)]
 
 
-
 def place_text_checkerboard(image, text, color=(255,255,255), alpha=1, step_x=0.1, step_y=0.1, angle=0,
                             font=cv2.FONT_HERSHEY_SIMPLEX, font_scale=1.0, thickness=3):
     image_size = image.size
@@ -262,14 +263,6 @@ def read_image_rgb(path):
     return pil_img
 
 
-
-def save_iterable(path, _iter):
-    with open(path, 'w') as f:
-        for el in _iter:
-            f.write(f'{el}\n')
-    print(f'Saved successfully to {path}')
-
-
 def get_filepaths_recursive(dir):
     import itertools
     return list(itertools.chain.from_iterable(
@@ -299,20 +292,7 @@ def parallelize(func, inputs, n_workers=4):
     return results
 
 
-
 # ====================================================================
-
-def generate_random_string(length):
-    return ''.join(random.choices(string.ascii_lowercase + string.ascii_uppercase + string.digits + ' ', k=length))
-
-def generate_random_url(length, www_prob=0.5):
-    suffixes = ('ru', 'en', 'com', 'su', 'net')
-    random_s = ''.join(random.choices(string.ascii_lowercase*3 + string.digits + '-', k=length))
-    url = random_s+'.'+random.choice(suffixes)
-    if random.random() < www_prob:
-        url = 'www.'+url
-    return url
-
 
 def diagonal_watermark(pil_image, text):
     return place_random_diagonal_watermark(
@@ -328,6 +308,7 @@ def diagonal_watermark(pil_image, text):
         colors=COLORS,
     )
 
+
 def centered_watermark(pil_image, text):
     return place_random_centered_watermark(
         pil_image, 
@@ -340,6 +321,7 @@ def centered_watermark(pil_image, text):
         font_thickness_range=FONT_THICKNESS_RANGE,
         colors=COLORS,
     )
+
 
 def centered_angled_watermark(pil_image, text):
     return place_random_centered_watermark(
@@ -354,6 +336,7 @@ def centered_angled_watermark(pil_image, text):
         colors=COLORS,
     )
 
+
 def random_watermark(pil_image, text):
     return place_random_watermark(
         pil_image, 
@@ -365,6 +348,7 @@ def random_watermark(pil_image, text):
         font_thickness_range=FONT_THICKNESS_RANGE,
         colors=COLORS,
     )
+
 
 def random_angled_watermark(pil_image, text):
     return place_random_watermark(
@@ -393,6 +377,7 @@ def create_color_palette():
     colors.extend([[random.randint(210,255) for i in range(3)] for j in range(15)])
     return colors
 
+
 def get_text_height_in_percent_range(text):
     if len(text) >= 7:
         k = len(text)/7
@@ -402,6 +387,7 @@ def get_text_height_in_percent_range(text):
         return res
     else:
         return (0.07, 0.135)
+
 
 # ==================================
 COLORS = create_color_palette()
@@ -431,27 +417,127 @@ def generate_watermark(img) -> Image:
     return watermark_func(img_resized, get_random_watermark_text())
 
 
+def sort_by_index(_strs):
+    import re
+    def str_index(_str):
+        match = re.search(r'_(\d+)', _str)
+        return int(match.group(1)) if match else float('inf')
+    
+    return sorted(_strs, key=str_index)
+
+
 def generate_watermark_dataset(clean_dir, out_dir, n_workers=4):
     from functools import partial
-    clean_images_path = get_filepaths_recursive(clean_dir)
+    clean_images_path = [os.path.join(clean_dir, filename) 
+                         for filename in sort_by_index(os.listdir(clean_dir))]
     
     def add_watermark_and_save(inputs_, out_dir):
         try:
             index, clean_image_path = inputs_
-            pil_image = Image.open(clean_image_path).convert('RGB')
+            pil_image = Image.open(clean_image_path).convert('RGBA')
             watermarked = generate_watermark(pil_image)
-            save_path = os.path.join(out_dir, f'image_{index}.{get_extension(clean_image_path)}')
+            save_path = os.path.join(out_dir, f'image_{index}{get_extension(clean_image_path)}')
             watermarked.save(save_path)
         except Exception as e:
-            print(e)
+            save_path = os.path.join(out_dir, f'image_{index}.png')
+            watermarked.save(save_path)
+            # print(e)
     
     func_ = partial(add_watermark_and_save, out_dir=out_dir)
     inputs = enumerate(clean_images_path)
     parallelize(func_, inputs, n_workers=n_workers)
 
 
-generate_watermark_dataset(CLEAN_DIR, WATERMARK_DIR, n_workers=4)
+def segment_watermark(image_clean, image_watermark):
+    segmented = cv2.absdiff(image_clean, image_watermark)    
+    gray = cv2.cvtColor(segmented, cv2.COLOR_RGB2GRAY)
+    _, thresh = cv2.threshold(gray, 200, 255, cv2.THRESH_BINARY)
+    return thresh
 
+
+def segment_and_save_watermarks(clean_dir, watermark_dir, out_dir, n_workers=1):
+    
+    clean_filepath = sort_by_index([os.path.join(clean_dir, filename)  for filename in os.listdir(clean_dir)])
+    watermark_filepath = sort_by_index([os.path.join(watermark_dir, filename)  for filename in os.listdir(watermark_dir)])
+    
+    def save_segmented(inputs, out_dir=out_dir):
+        index, clean_path, watermark_path = [inputs[0], *inputs[1]]
+        img_clean = cv2.imread(clean_path, cv2.IMREAD_COLOR_RGB)
+        img_watermark = cv2.imread(watermark_path, cv2.IMREAD_COLOR_RGB)
+        segmented = segment_watermark(img_clean, img_watermark)
+        cv2.imwrite(os.path.join(out_dir, f'image_{index}'), segmented)
+    
+    inputs = enumerate(zip(clean_filepath, watermark_filepath))
+    for i, el in inputs:
+        print(el)
+        if i > 10:
+            break
+        
+    parallelize(save_segmented, inputs, n_workers=n_workers)
+
+
+# =============================
+
+generate_watermark_dataset(CLEAN_UPSCALED_DIR, WATERMARK_UPSCALED_DIR, n_workers=4)
+# segment_and_save_watermarks(CLEAN_DIR, WATERMARK_DIR, out_dir='data/segmented', n_workers=1)
+
+
+clean_images_path = [os.path.join(CLEAN_DIR, filename) 
+                     for filename in sort_by_index(os.listdir(CLEAN_DIR))]
+watermark_images_path = [os.path.join(WATERMARK_DIR, filename) 
+                     for filename in sort_by_index(os.listdir(WATERMARK_DIR))]
+# clean_upscaled_images_path = [os.path.join(CLEAN_UPSCALED_DIR, filename) 
+#                      for filename in sort_by_index(os.listdir(CLEAN_DIR))]
+# watermark_upscaled_images_path = [os.path.join(WATERMARK_UPSCALED_DIR, filename) 
+#                      for filename in sort_by_index(os.listdir(WATERMARK_DIR))]
+
+# test_clean_images = [cv2.imread(path, cv2.IMREAD_COLOR_RGB) for path in clean_images_path[:5]]
+# test_watermark_images = [cv2.imread(path, cv2.IMREAD_COLOR_RGB) for path in watermark_images_path[:5]]
+
+# test_clean_upscaled_images_path = [cv2.imread(path, cv2.IMREAD_COLOR_RGB) for path in clean_upscaled_images_path[:5]]
+# test_watermark_upscaled_images_path = [cv2.imread(path, cv2.IMREAD_COLOR_RGB) for path in watermark_upscaled_images_path[:5]]
+
+
+# from copy import deepcopy
+# images = deepcopy(test_clean_images)
+# images.extend(test_watermark_images)
+
+# import matplotlib.pyplot as plt
+# rows, cols = 2, 5
+# titles = [f"Image {i+1}" for i in range(rows * cols)]
+# fig, ax = plt.subplots(rows, cols, figsize=(cols * 3, rows * 3))
+# ax = np.array(ax).reshape(rows, cols) if rows > 1 and cols > 1 else np.array(ax).reshape(-1)
+
+# for i, axi in enumerate(ax.flat):
+#     if i < len(images):
+#         axi.imshow(cv2.cvtColor(images[i], cv2.COLOR_BGR2RGB))
+#         axi.set_title(titles[i])
+#         axi.axis("off")
+#     else:
+#         axi.axis("off")
+
+# plt.tight_layout()
+# plt.show()
+
+
+
+# def shape_from_path(path):
+#     img = cv2.imread(path, cv2.IMREAD_COLOR_RGB)
+#     return None if img is None else img.shape
+
+
+# clean_image_shapes = [*filter(lambda x: x is not None, [shape_from_path(path) for path in clean_images_path[:2000]])]
+# watermark_image_shapes = [*filter(lambda x: x is not None, [shape_from_path(path) for path in watermark_images_path[:2000]])]
+
+
+# print(len(clean_image_shapes), clean_image_shapes[:10], sep='\n')
+# print(len(watermark_image_shapes), watermark_image_shapes[:10], sep='\n')
+
+# size = lambda x: x[0] * x[1]
+
+# max_shape = max(watermark_image_shapes, key=size)
+# min_shape = min(watermark_image_shapes, key=size)
+# print(max_shape, min_shape)
 
 
 

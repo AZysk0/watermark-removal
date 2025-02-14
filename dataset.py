@@ -75,6 +75,27 @@ def copy_images_to(paths, out_dir, n_workers=4):
     parallelize(copy_img, index_image_pairs, n_workers=n_workers)
 
 
+def resize_and_save_images(paths, out_dir, n_workers=4):
+    from functools import partial
+    os.makedirs(out_dir, exist_ok=True)
+    
+    def copy_img(args):
+        try:
+            index, image_path = args
+            ext = image_path.split('.')[-1]
+            dst = os.path.join(out_dir, f'image_{index}.{ext}')
+            # shutil.copy(image_path, dst)
+            img = cv2.imread(image_path)
+            resized = cv2.resize(img, dsize=(600, 600), interpolation=cv2.INTER_LANCZOS4)
+            cv2.imwrite(dst, resized)        
+        except Exception as e:
+            # print(f"ERROR: image_path: {image_path}, extension: {ext}. Skipping this image...")
+            print(e)
+    
+    index_image_pairs = zip(itertools.count(start=0, step=1), paths)
+    parallelize(copy_img, index_image_pairs, n_workers=n_workers)
+
+
 # =====================================
 class WatermarkDataset(torch.utils.data.Dataset):
     """Some Information about WatermarkDataset"""
@@ -88,8 +109,14 @@ class WatermarkDataset(torch.utils.data.Dataset):
         return
 
 
-image_dir = 'data/images'
-watermark_dir = 'data/watermark'
+def sort_by_index(_strs):
+    import re
+    def str_index(_str):
+        match = re.search(r'_(\d+)', _str)
+        return int(match.group(1)) if match else float('inf')
+    
+    return sorted(_strs, key=str_index)
+
 
 watermarks = [
     "CONFIDENTIAL", "SAMPLE", "DRAFT", "PRIVATE", "RESTRICTED", 
@@ -126,6 +153,17 @@ watermarks = [
 ]
 
 
-save_iterable('data/watermark_texts.txt', watermarks)
+image_dir = 'data/images_'
+watermark_dir = 'data/watermark'
+
+image_paths = sort_by_index(get_filepaths_recursive(image_dir))
+# print(len(image_paths), image_paths[:10])
+
+resize_and_save_images(image_paths, 'data/upscaled', n_workers=6)
+
+
+# save_iterable('data/watermark_texts.txt', watermarks)
+
+
 
 
