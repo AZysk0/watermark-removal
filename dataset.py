@@ -153,16 +153,8 @@ watermarks = [
 ]
 
 
-image_dir = 'data/images_'
-watermark_dir = 'data/watermark'
-
-image_paths = sort_by_index(get_filepaths_recursive(image_dir))
-# print(len(image_paths), image_paths[:10])
-
-resize_and_save_images(image_paths, 'data/upscaled', n_workers=6)
-
-
-# save_iterable('data/watermark_texts.txt', watermarks)
+image_dir = 'data/upscaled'
+watermark_dir = 'data/watermark_upscaled'
 
 
 
