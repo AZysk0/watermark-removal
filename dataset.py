@@ -13,6 +13,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
+from torchvision import transforms
 
 # ==============
 
@@ -96,19 +97,6 @@ def resize_and_save_images(paths, out_dir, n_workers=4):
     parallelize(copy_img, index_image_pairs, n_workers=n_workers)
 
 
-# =====================================
-class WatermarkDataset(torch.utils.data.Dataset):
-    """Some Information about WatermarkDataset"""
-    def __init__(self):
-        super(WatermarkDataset, self).__init__()
-
-    def __getitem__(self, index):
-        return 
-
-    def __len__(self):
-        return
-
-
 def sort_by_index(_strs):
     import re
     def str_index(_str):
@@ -116,6 +104,49 @@ def sort_by_index(_strs):
         return int(match.group(1)) if match else float('inf')
     
     return sorted(_strs, key=str_index)
+
+
+def get_image_paths(dir, n=None):
+    n = len(os.listdir(dir)) if n is None else n
+    valid_ext = ['.jpg', '.jpeg', '.png', '.gif', '.bmp']
+    paths = [os.path.join(dir, filename) for filename in sort_by_index(os.listdir(dir))[:n]
+             if any(filename.lower().endswith(ext) for ext in valid_ext)]
+    return paths
+
+# =====================================
+
+class WatermarkDataset(Dataset):
+    
+    def __init__(self, clean_dir, wm_dir, segment_dir, n=None, transform=None):
+        super(WatermarkDataset, self).__init__()
+        self.clean_dir = clean_dir
+        self.wm_dir = wm_dir
+        self.segment_dir = segment_dir
+        self.clean_images_path = get_image_paths(self.clean_dir, n=n)
+        self.wm_images_path = get_image_paths(self.wm_dir, n=n)
+        self.segment_images_path = get_image_paths(self.segment_dir, n=n)
+        self.transform = transform
+
+    def __getitem__(self, index):
+        clean_img = cv2.imread(self.clean_images_path[index], cv2.IMREAD_COLOR)
+        wm_img = cv2.imread(self.wm_images_path[index], cv2.IMREAD_COLOR)
+        segment_img = cv2.imread(self.segment_images_path[index], cv2.IMREAD_GRAYSCALE)
+
+        if clean_img is None or wm_img is None or segment_img is None:
+            raise RuntimeError(f"Error loading image at index {index}")
+
+        clean_img = cv2.cvtColor(clean_img, cv2.COLOR_BGR2RGB)
+        wm_img = cv2.cvtColor(wm_img, cv2.COLOR_BGR2RGB)
+
+        if self.transform:
+            clean_img = self.transform(clean_img)
+            wm_img = self.transform(wm_img)
+            segment_img = transforms.ToTensor()(segment_img)
+
+        return clean_img, wm_img, segment_img
+
+    def __len__(self):
+        return min(len(self.clean_images_path), len(self.segment_images_path), len(self.wm_images_path))
 
 
 watermarks = [
