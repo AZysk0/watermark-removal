@@ -5,6 +5,7 @@ import cv2
 import numpy as np 
 from PIL import Image
 import math
+import re
 
 # ====================
 def read_file(path):
@@ -41,6 +42,31 @@ CV2_FONTS = [
 ]
 
 
+def get_max_pattern_index(dir, pattern):
+    files = sort_by_index(os.listdir(dir))
+    if not files:
+        return 0
+    
+    # e.g. image_69.jpg
+    indices = map(
+        lambda m: int(m.group(1)),
+        [re.search(pattern, f) for f in files]
+    )
+    # print(list(indices))
+    return max(indices, default=0)
+
+
+def save_segmented(mask, dir):
+    max_index = get_max_pattern_index(dir, r'image_(\d+).')
+    save_path = os.path.join(dir, f'image_{max_index + 1}.jpg')
+    pil_mask = Image.fromarray(mask).convert('L')
+    pil_mask.save(save_path)
+
+# def get_image_name_indexed(dir):
+#     max_index = get_max_pattern_index(dir, r'{pattern}_\d+.')
+#     return f'{dir}/image_{max_index}'
+
+
 def random_float(x, y):
     return random.random()*(y-x)+x
 
@@ -61,6 +87,12 @@ def place_text(image, text, color=(255,255,255), alpha=1, position=(0, 0), angle
     overlay = np.zeros_like(image)
     output = image.copy()
     
+    # save segmented watermark part
+    segment_dir = 'data/segmented'
+    wm_mask = np.zeros_like(image)
+    cv2.putText(wm_mask, text, position, font, font_scale, color, thickness)
+    save_segmented(wm_mask, segment_dir)
+
     cv2.putText(overlay, text, position, font, font_scale, color, thickness)
     
     if angle != 0:
@@ -198,6 +230,12 @@ def place_text_checkerboard(image, text, color=(255,255,255), alpha=1, step_x=0.
     overlay = center_crop(overlay, image_size[0], image_size[1])
     overlay[overlay==0] = image[overlay==0]
     overlay = overlay.astype(np.uint8)
+
+    # save segmented watermark part    
+    wm_mask = overlay.copy()
+    segment_dir = 'data/segmented'
+    save_segmented(wm_mask, segment_dir)
+    
     cv2.addWeighted(overlay, alpha, output, 1-alpha, 0, output)
     
     return Image.fromarray(output)
@@ -426,10 +464,10 @@ def sort_by_index(_strs):
     return sorted(_strs, key=str_index)
 
 
-def generate_watermark_dataset(clean_dir, out_dir, n_workers=4):
+def generate_watermark_dataset(clean_dir, out_dir, n=100, n_workers=4):
     from functools import partial
     clean_images_path = [os.path.join(clean_dir, filename) 
-                         for filename in sort_by_index(os.listdir(clean_dir))]
+                         for filename in sort_by_index(os.listdir(clean_dir))[:n]]
     
     def add_watermark_and_save(inputs_, out_dir):
         try:
@@ -478,14 +516,14 @@ def segment_and_save_watermarks(clean_dir, watermark_dir, out_dir, n_workers=1):
 
 # =============================
 
-generate_watermark_dataset(CLEAN_UPSCALED_DIR, WATERMARK_UPSCALED_DIR, n_workers=4)
+generate_watermark_dataset(CLEAN_UPSCALED_DIR, WATERMARK_UPSCALED_DIR, n=5000, n_workers=1)
 # segment_and_save_watermarks(CLEAN_DIR, WATERMARK_DIR, out_dir='data/segmented', n_workers=1)
 
 
-clean_images_path = [os.path.join(CLEAN_DIR, filename) 
-                     for filename in sort_by_index(os.listdir(CLEAN_DIR))]
-watermark_images_path = [os.path.join(WATERMARK_DIR, filename) 
-                     for filename in sort_by_index(os.listdir(WATERMARK_DIR))]
+# clean_images_path = [os.path.join(CLEAN_DIR, filename) 
+#                      for filename in sort_by_index(os.listdir(CLEAN_DIR))]
+# watermark_images_path = [os.path.join(WATERMARK_DIR, filename) 
+#                      for filename in sort_by_index(os.listdir(WATERMARK_DIR))]
 # clean_upscaled_images_path = [os.path.join(CLEAN_UPSCALED_DIR, filename) 
 #                      for filename in sort_by_index(os.listdir(CLEAN_DIR))]
 # watermark_upscaled_images_path = [os.path.join(WATERMARK_UPSCALED_DIR, filename) 
