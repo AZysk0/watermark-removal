@@ -6,6 +6,7 @@ import numpy as np
 from PIL import Image
 import math
 import re
+from copy import deepcopy
 
 # ====================
 def read_file(path):
@@ -62,6 +63,61 @@ def save_segmented(mask, dir):
     pil_mask = Image.fromarray(mask).convert('L')
     pil_mask.save(save_path)
 
+
+def save_decomposed(mask: np.ndarray, alpha_: float, color: tuple) -> None:
+    mask_save_dir = 'data/_mask'
+    alpha_save_dir = 'data/_alpha'
+    wm_save_dir = 'data/_wm'
+    
+    os.makedirs(mask_save_dir, exist_ok=True)
+    os.makedirs(alpha_save_dir, exist_ok=True)
+    os.makedirs(wm_save_dir, exist_ok=True)
+    
+    # canvas = np.zeros_like(mask[:, :, :3])
+    
+    mask_rgb = mask[:, :, :3]
+    mask = cv2.cvtColor(mask_rgb.astype(np.uint8), cv2.COLOR_RGB2GRAY)
+    _, mask = cv2.threshold(mask.astype(np.uint8), 5, 255, cv2.THRESH_BINARY)
+    mask = mask[:, :, None]
+    alpha = mask * alpha_
+    colored_mask = (np.array(color).reshape(1, -1) * mask / 255).astype(np.uint8)
+    
+    wm_overlay = np.zeros(shape=(*mask.shape[:2], 3), dtype=np.uint8)
+    # print(mask.shape, alpha.shape, colored_mask.shape, wm_overlay.shape)
+    
+    # print(colored_mask.dtype, wm_overlay.dtype)
+    # print(colored_mask.shape, wm_overlay.shape)
+    
+    wm = cv2.addWeighted(colored_mask, alpha_, wm_overlay, 1 - alpha_, 0)
+    
+    # img1 = np.repeat(mask.copy().astype(np.uint8), 3, axis=2)
+    # img2 = np.repeat(alpha.copy().astype(np.uint8), 3, axis=2)
+    # img3 = wm.copy().astype(np.uint8)
+    # cv2.imshow("Window Name", np.hstack((img1, img2, img3,)))
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
+    # print(img1.shape, img2.shape, img3.shape,)
+
+    max_index = get_max_pattern_index(mask_save_dir, r'image_(\d+).jpg')
+    mask_save_path = os.path.join(mask_save_dir, f'image_{max_index + 1}.jpg')
+    alpha_save_path = os.path.join(alpha_save_dir, f'image_{max_index + 1}.jpg')
+    wm_save_path = os.path.join(wm_save_dir, f'image_{max_index + 1}.jpg')
+
+    pil_mask = Image.fromarray(mask.squeeze(), mode="L")
+    pil_alpha = Image.fromarray(alpha.squeeze(), mode='L')
+    pil_wm = Image.fromarray(wm).convert('RGB')
+    
+    # pil_mask = Image.fromarray(mask)
+    # pil_alpha = Image.fromarray(alpha)
+    # pil_wm = Image.fromarray(wm)
+    
+    print(pil_mask.size, pil_alpha.size, pil_wm.size)
+    
+    pil_mask.save(mask_save_path)
+    pil_alpha.save(alpha_save_path)
+    pil_wm.save(wm_save_path)
+
+
 # def get_image_name_indexed(dir):
 #     max_index = get_max_pattern_index(dir, r'{pattern}_\d+.')
 #     return f'{dir}/image_{max_index}'
@@ -88,10 +144,10 @@ def place_text(image, text, color=(255,255,255), alpha=1, position=(0, 0), angle
     output = image.copy()
     
     # save segmented watermark part
-    segment_dir = 'data/segmented'
-    wm_mask = np.zeros_like(image)
-    cv2.putText(wm_mask, text, position, font, font_scale, color, thickness)
-    save_segmented(wm_mask, segment_dir)
+    # segment_dir = 'data/segmented'
+    # wm_mask = np.zeros_like(image)
+    # cv2.putText(wm_mask, text, position, font, font_scale, color, thickness)
+    # save_segmented(wm_mask, segment_dir)
 
     cv2.putText(overlay, text, position, font, font_scale, color, thickness)
     
@@ -99,7 +155,10 @@ def place_text(image, text, color=(255,255,255), alpha=1, position=(0, 0), angle
         text_w, text_h = get_text_size(text, font, font_scale, thickness)
         rotate_M = cv2.getRotationMatrix2D((position[0]+text_w//2, position[1]-text_h//2), angle, 1)
         overlay = cv2.warpAffine(overlay, rotate_M, (overlay.shape[1], overlay.shape[0]))
-    
+
+    wm_mask = overlay.copy()
+    save_decomposed(wm_mask, alpha, color)
+        
     overlay[overlay==0] = image[overlay==0]
     cv2.addWeighted(overlay, alpha, output, 1-alpha, 0, output)
     
@@ -213,7 +272,7 @@ def place_text_checkerboard(image, text, color=(255,255,255), alpha=1, step_x=0.
     w, h = overlay_size
     overlay = np.zeros((overlay_size[1], overlay_size[0], 3))
     output = image.copy()
-    
+
     text_w, text_h = get_text_size(text, font, font_scale, thickness)
     
     c = 0
@@ -227,15 +286,13 @@ def place_text_checkerboard(image, text, color=(255,255,255), alpha=1, step_x=0.
         rotate_M = cv2.getRotationMatrix2D((w//2, h//2), angle, 1)
         overlay = cv2.warpAffine(overlay, rotate_M, (overlay.shape[1], overlay.shape[0]))
     
+    wm_mask = overlay.copy()
+    save_decomposed(wm_mask, alpha, color)
+    
     overlay = center_crop(overlay, image_size[0], image_size[1])
     overlay[overlay==0] = image[overlay==0]
     overlay = overlay.astype(np.uint8)
-
-    # save segmented watermark part    
-    wm_mask = overlay.copy()
-    segment_dir = 'data/segmented'
-    save_segmented(wm_mask, segment_dir)
-    
+    # segment_dir = 'data/segmented'
     cv2.addWeighted(overlay, alpha, output, 1-alpha, 0, output)
     
     return Image.fromarray(output)
@@ -477,9 +534,9 @@ def generate_watermark_dataset(clean_dir, out_dir, n=100, n_workers=4):
             save_path = os.path.join(out_dir, f'image_{index}{get_extension(clean_image_path)}')
             watermarked.save(save_path)
         except Exception as e:
+            # print(e)
             save_path = os.path.join(out_dir, f'image_{index}.png')
             watermarked.save(save_path)
-            # print(e)
     
     func_ = partial(add_watermark_and_save, out_dir=out_dir)
     inputs = enumerate(clean_images_path)
@@ -516,7 +573,7 @@ def segment_and_save_watermarks(clean_dir, watermark_dir, out_dir, n_workers=1):
 
 # =============================
 
-generate_watermark_dataset(CLEAN_UPSCALED_DIR, WATERMARK_UPSCALED_DIR, n=5000, n_workers=1)
+generate_watermark_dataset(CLEAN_UPSCALED_DIR, WATERMARK_UPSCALED_DIR, n=100, n_workers=1)
 # segment_and_save_watermarks(CLEAN_DIR, WATERMARK_DIR, out_dir='data/segmented', n_workers=1)
 
 
