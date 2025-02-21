@@ -74,14 +74,16 @@ def save_decomposed(mask: np.ndarray, alpha_: float, color: tuple) -> None:
     os.makedirs(wm_save_dir, exist_ok=True)
     
     # canvas = np.zeros_like(mask[:, :, :3])
+    # print(mask.shape)
     
     mask_rgb = mask[:, :, :3]
     mask = cv2.cvtColor(mask_rgb.astype(np.uint8), cv2.COLOR_RGB2GRAY)
     _, mask = cv2.threshold(mask.astype(np.uint8), 5, 255, cv2.THRESH_BINARY)
     mask = mask[:, :, None]
-    alpha = mask * alpha_
+    alpha = (mask * alpha_).astype(np.uint8)
     colored_mask = (np.array(color).reshape(1, -1) * mask / 255).astype(np.uint8)
     
+    # print(alpha.shape)
     wm_overlay = np.zeros(shape=(*mask.shape[:2], 3), dtype=np.uint8)
     # print(mask.shape, alpha.shape, colored_mask.shape, wm_overlay.shape)
     
@@ -111,16 +113,11 @@ def save_decomposed(mask: np.ndarray, alpha_: float, color: tuple) -> None:
     # pil_alpha = Image.fromarray(alpha)
     # pil_wm = Image.fromarray(wm)
     
-    print(pil_mask.size, pil_alpha.size, pil_wm.size)
+    # print(pil_mask.size, pil_alpha.size, pil_wm.size)
     
     pil_mask.save(mask_save_path)
     pil_alpha.save(alpha_save_path)
     pil_wm.save(wm_save_path)
-
-
-# def get_image_name_indexed(dir):
-#     max_index = get_max_pattern_index(dir, r'{pattern}_\d+.')
-#     return f'{dir}/image_{max_index}'
 
 
 def random_float(x, y):
@@ -142,12 +139,6 @@ def place_text(image, text, color=(255,255,255), alpha=1, position=(0, 0), angle
     image = np.array(image)
     overlay = np.zeros_like(image)
     output = image.copy()
-    
-    # save segmented watermark part
-    # segment_dir = 'data/segmented'
-    # wm_mask = np.zeros_like(image)
-    # cv2.putText(wm_mask, text, position, font, font_scale, color, thickness)
-    # save_segmented(wm_mask, segment_dir)
 
     cv2.putText(overlay, text, position, font, font_scale, color, thickness)
     
@@ -286,10 +277,10 @@ def place_text_checkerboard(image, text, color=(255,255,255), alpha=1, step_x=0.
         rotate_M = cv2.getRotationMatrix2D((w//2, h//2), angle, 1)
         overlay = cv2.warpAffine(overlay, rotate_M, (overlay.shape[1], overlay.shape[0]))
     
+    overlay = center_crop(overlay, image_size[0], image_size[1])
     wm_mask = overlay.copy()
     save_decomposed(wm_mask, alpha, color)
     
-    overlay = center_crop(overlay, image_size[0], image_size[1])
     overlay[overlay==0] = image[overlay==0]
     overlay = overlay.astype(np.uint8)
     # segment_dir = 'data/segmented'
@@ -573,8 +564,7 @@ def segment_and_save_watermarks(clean_dir, watermark_dir, out_dir, n_workers=1):
 
 # =============================
 
-generate_watermark_dataset(CLEAN_UPSCALED_DIR, WATERMARK_UPSCALED_DIR, n=100, n_workers=1)
-# segment_and_save_watermarks(CLEAN_DIR, WATERMARK_DIR, out_dir='data/segmented', n_workers=1)
+# generate_watermark_dataset(CLEAN_UPSCALED_DIR, WATERMARK_UPSCALED_DIR, n=5000, n_workers=1)
 
 
 # clean_images_path = [os.path.join(CLEAN_DIR, filename) 
@@ -613,27 +603,4 @@ generate_watermark_dataset(CLEAN_UPSCALED_DIR, WATERMARK_UPSCALED_DIR, n=100, n_
 
 # plt.tight_layout()
 # plt.show()
-
-
-
-# def shape_from_path(path):
-#     img = cv2.imread(path, cv2.IMREAD_COLOR_RGB)
-#     return None if img is None else img.shape
-
-
-# clean_image_shapes = [*filter(lambda x: x is not None, [shape_from_path(path) for path in clean_images_path[:2000]])]
-# watermark_image_shapes = [*filter(lambda x: x is not None, [shape_from_path(path) for path in watermark_images_path[:2000]])]
-
-
-# print(len(clean_image_shapes), clean_image_shapes[:10], sep='\n')
-# print(len(watermark_image_shapes), watermark_image_shapes[:10], sep='\n')
-
-# size = lambda x: x[0] * x[1]
-
-# max_shape = max(watermark_image_shapes, key=size)
-# min_shape = min(watermark_image_shapes, key=size)
-# print(max_shape, min_shape)
-
-
-
 
