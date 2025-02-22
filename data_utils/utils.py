@@ -564,7 +564,7 @@ def segment_and_save_watermarks(clean_dir, watermark_dir, out_dir, n_workers=1):
 
 # =============================
 
-# generate_watermark_dataset(CLEAN_UPSCALED_DIR, WATERMARK_UPSCALED_DIR, n=5000, n_workers=1)
+generate_watermark_dataset(CLEAN_UPSCALED_DIR, WATERMARK_UPSCALED_DIR, n=5000, n_workers=1)
 
 
 # clean_images_path = [os.path.join(CLEAN_DIR, filename) 

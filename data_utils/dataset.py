@@ -149,6 +149,38 @@ class WatermarkDataset(Dataset):
         return min(len(self.clean_images_path), len(self.segment_images_path), len(self.wm_images_path))
 
 
+class WatermarkSimpleDataset(Dataset):
+    """dataset for primitive pix2pix model"""
+    def __init__(self, transform=None):
+        super(WatermarkSimpleDataset, self).__init__()
+        self.clean_dir = 'data/upscaled'
+        self.wm_dir = 'data/watermark_upscaled'
+        self.clean_images_path = get_image_paths(self.clean_dir)
+        self.wm_images_path = get_image_paths(self.wm_dir)
+        self.transform = transform
+
+    def __getitem__(self, index):
+        clean_img = cv2.imread(self.clean_images_path[index], cv2.IMREAD_COLOR)
+        wm_img = cv2.imread(self.wm_images_path[index], cv2.IMREAD_COLOR)
+
+        if clean_img is None or wm_img is None:
+            raise RuntimeError(f"Error loading image at index {index}")
+
+        clean_img = cv2.cvtColor(clean_img, cv2.COLOR_BGR2RGB)
+        wm_img = cv2.cvtColor(wm_img, cv2.COLOR_BGR2RGB)
+
+        if self.transform:
+            clean_img = self.transform(clean_img)
+            wm_img = self.transform(wm_img)
+
+        return clean_img, wm_img
+
+    def __len__(self):
+        return min(len(self.clean_images_path), len(self.wm_images_path))
+
+
+
+# ===================================
 watermarks = [
     "CONFIDENTIAL", "SAMPLE", "DRAFT", "PRIVATE", "RESTRICTED", 
     "DO NOT COPY", "FOR INTERNAL USE ONLY", "CLASSIFIED", "COPYRIGHT", 
