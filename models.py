@@ -55,7 +55,7 @@ class ResNetRemoval(nn.Module):
         self._init_train_params()
     
     def train(self, epochs=3):
-        trainloader = DataLoader(self.dataset, batch_size=4)
+        trainloader = DataLoader(self.dataset, batch_size=8)
         device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
         
         for epoch in range(epochs):
@@ -126,7 +126,7 @@ class ResNetRemoval(nn.Module):
 
     def _init_train_params(self):
         self.criterion = nn.MSELoss()  # primitive loss func
-        self.optimizer = torch.optim.Adam(self.parameters(), lr=0.001)
+        self.optimizer = torch.optim.Adam(self.parameters(), lr=0.0003)
         print('Loss function and optimizer have been initialized successfully')
 
 
