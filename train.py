@@ -9,11 +9,11 @@ from models import ResNetRemoval
 device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
 simple_resnet_wm_removal = ResNetRemoval(img_channels=3).to(device=device)
-# simple_resnet_wm_removal.train(epochs=3)
+simple_resnet_wm_removal.train(epochs=3)
 
 checkpoint_save_path = 'checkpoints/simple_resnet.pth'
-# simple_resnet_wm_removal._save_checkpoint(checkpoint_save_path)
-simple_resnet_wm_removal._load_checkpoint(checkpoint_save_path)
+simple_resnet_wm_removal._save_checkpoint(checkpoint_save_path)
+# simple_resnet_wm_removal._load_checkpoint(checkpoint_save_path)
 
 wm_dir = 'data/watermark_upscaled'
 clean_dir = 'data/upscaled'

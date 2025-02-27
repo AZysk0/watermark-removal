@@ -9,6 +9,7 @@ from torchvision import transforms
 from torch.utils.data import DataLoader
 from tqdm import tqdm
 import numpy as np
+from loss_func.ssim import SSIM
 
 from data_utils.dataloader import wm_dataloader
 from data_utils.dataset import WatermarkSimpleDataset
@@ -125,9 +126,11 @@ class ResNetRemoval(nn.Module):
         print('Dataset has been initialized successfully')
 
     def _init_train_params(self):
-        self.criterion = nn.MSELoss()  # primitive loss func
+        # self.criterion = nn.MSELoss()  # primitive loss func
+        self.criterion = SSIM()
         self.optimizer = torch.optim.Adam(self.parameters(), lr=0.0003)
         print('Loss function and optimizer have been initialized successfully')
+
 
 
 class ResNetGenerator(nn.Module):
