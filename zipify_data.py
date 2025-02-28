@@ -146,17 +146,8 @@ def copy_files_from_to(file_paths, root_dir='/data', target_dir='/data/temp_dir'
             .fmap(lambda path: path.replace(root_dir, target_dir))\
             .fmap(lambda s: s.replace('/projects', '', 1))\
             .value
-        
-        # print(from_path)
-        # print(save_folder)
+            
         shutil.copy(from_path, save_folder)
-    
-    # print(files_flatten)
-    # print(subfolders_functor)
-    # print(files_flatten)
-    # print(target_subfolders)
-    # print(*zip(from_path_abs_functor.values, to_paths_abs_functor.values), sep='\n')
-    
 
 
 def folder_to_zip(folder_path, zip_path):
@@ -178,11 +169,16 @@ def remove_folder(dir):
     
 
 def zipify_dirs(dirs, zip_dest='data/wm_dataset.zip', n=100):
-    temp_dir = '/data/temp_dir'    
+    temp_dir = '/data/temp_dir'
     file_paths = get_files_path(dirs, n=n)
+    project_root = os.path.abspath(os.path.dirname(__file__))
+    super_mega_abs_temp_dir = os.path.join(project_root, os.path.join(project_root, *temp_dir.split('/')))
+    
+    print(project_root, super_mega_abs_temp_dir)
     copy_files_from_to(file_paths, root_dir='/data', target_dir=temp_dir)
-    # folder_to_zip(temp_dir, zip_dest)
-    # remove_folder(os.path.abspath(temp_dir))
+    # print(os.path.relpath(temp_dir))
+    folder_to_zip(super_mega_abs_temp_dir, zip_dest)
+    remove_folder(os.path.abspath(super_mega_abs_temp_dir))
 
 
 image_dirs = ['data/upscaled', 'data/watermark_upscaled', 
