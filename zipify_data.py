@@ -68,18 +68,19 @@ def omit_filename(filepath):
     print(res)
     return res
 
+
 def extract_subfolder(filepath, root_dir):
-    # relative_path = os.path.relpath(filename, root_dir)
-    # subfolder = os.path.dirname(relative_path).replace('\\', '/')
+    relative_path = os.path.relpath(filepath, root_dir)
+    subfolder = os.path.dirname(relative_path).replace('\\', '/')
     # print(relative_path)
-    # return subfolder if subfolder else ''
+    return subfolder if subfolder else ''
     # path = os.path.abspath(filename).replace('\\', '/')
-    res = '/'.join(filepath.split('/')[:-1])  # omit filename
+    # res = '/'.join(filepath.split('/')[:-1])  # omit filename
     # print(res)
-    return res
+    # return res
 
 
-def remove_folder_files(dir):    
+def remove_folder_files(dir):
     for file_name in os.listdir(dir):
         file_path = os.path.join(dir, file_name)
         
@@ -108,6 +109,7 @@ def copy_files_from_to(file_paths, root_dir='/data', target_dir='/data/temp_dir'
 
     # file_paths in the form [(1 2 3 ... n), (... n), ...]
     files_flatten = list(chain.from_iterable(file_paths))
+    # print(files_flatten)
     
     # used to create folders to save inside target dir
     subfolders_functor = ListFunctor(files_flatten)\
@@ -118,8 +120,11 @@ def copy_files_from_to(file_paths, root_dir='/data', target_dir='/data/temp_dir'
     
     target_subfolders = subfolders_functor\
         .fmap(lambda path: path.replace(root_dir, target_dir))\
-        .values
-    # create_folders(target_dir, target_subfolders)
+        .fmap(lambda s: s.replace('/projects', '', 1))\
+        .values  # removing /projects substring bcz im fucking donkey
+        
+    # print(*target_subfolders, sep='\n')
+    create_folders(target_dir, target_subfolders)
     
     to_paths_abs_functor = ListFunctor(files_flatten)\
         .fmap(lambda x: x.replace('\\', '/'))\
@@ -130,23 +135,23 @@ def copy_files_from_to(file_paths, root_dir='/data', target_dir='/data/temp_dir'
         .fmap(lambda x: x.replace('\\', '/'))\
         .fmap(lambda x: x.replace(target_dir[1:], root_dir[1:]))
     
-    for from_path in from_path_abs_functor.values:
-        # save_folder = Functor(from_path)\
-        #     .fmap(extract_subfolder, root_dir=root_dir)\
-        #     .fmap(os.path.abspath)\
-        #     .fmap(lambda x: x.replace('\\', '/'))\
-        #     .fmap(lambda path: path.replace(root_dir, target_dir))\
-        #     .value
-        
-        save_folder = Functor(from_path)\
-            .fmap(lambda s: s.replace(root_dir, target_dir))\
-            .fmap(omit_filename)\
-            # .value
-        
-        # print(from_path, save_folder, sep='\n')
-        print(save_folder)
-        # shutil.copy(from_path, save_folder)
+    # print(*from_path_abs_functor.values, sep='\n')
     
+    for from_path in from_path_abs_functor.values:
+        # pass
+        save_folder = Functor(from_path)\
+            .fmap(extract_subfolder, root_dir=root_dir)\
+            .fmap(os.path.abspath)\
+            .fmap(lambda x: x.replace('\\', '/'))\
+            .fmap(lambda path: path.replace(root_dir, target_dir))\
+            .fmap(lambda s: s.replace('/projects', '', 1))\
+            .value
+        
+        # print(from_path)
+        # print(save_folder)
+        shutil.copy(from_path, save_folder)
+    
+    # print(files_flatten)
     # print(subfolders_functor)
     # print(files_flatten)
     # print(target_subfolders)
@@ -176,7 +181,7 @@ def zipify_dirs(dirs, zip_dest='data/wm_dataset.zip', n=100):
     temp_dir = '/data/temp_dir'    
     file_paths = get_files_path(dirs, n=n)
     copy_files_from_to(file_paths, root_dir='/data', target_dir=temp_dir)
-    folder_to_zip(temp_dir, zip_dest)
+    # folder_to_zip(temp_dir, zip_dest)
     # remove_folder(os.path.abspath(temp_dir))
 
 
