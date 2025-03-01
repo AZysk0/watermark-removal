@@ -185,6 +185,6 @@ image_dirs = ['data/upscaled', 'data/watermark_upscaled',
               'data/_alpha', 'data/_mask', 'data/_wm']
 
 # get_files_path(image_dirs, n=10)
-zipify_dirs(image_dirs, n=10)
+zipify_dirs(image_dirs, n=1000)
 
 
